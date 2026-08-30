@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mandate & Spend-Gate Service | Razorpay Agentic Commerce</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="navbar">
+      <div class="nav-brand">
+        <div class="logo-icon">🛡️</div>
+        <div>
+          <h1>Mandate & Spend-Gate Service</h1>
+          <p class="subtitle">Razorpay Hackathon Track 1 — AI Growth & Agentic Commerce</p>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <span class="status-badge live">● Gate Active</span>
+        <button id="btn-seed" class="btn btn-secondary" onclick="seedDb()">🌱 Reseed Mandates</button>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" onclick="switchTab('agent-sim')">🤖 AI Agent Simulator</button>
+      <button class="tab-btn" onclick="switchTab('mandates')">💳 Active Mandates (<span id="mandate-count">0</span>)</button>
+      <button class="tab-btn" onclick="switchTab('audit')">📜 Immutable Audit Trail</button>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="content-area">
+
+      <!-- TAB 1: AI AGENT SIMULATOR -->
+      <section id="tab-agent-sim" class="tab-content active">
+        <div class="grid-2col">
+          <!-- Chat Box -->
+          <div class="card chat-card">
+            <div class="card-header">
+              <h2>🤖 Agent Intent & Shopping Chat</h2>
+              <span class="badge badge-info">Deterministic Spend Enforcement</span>
+            </div>
+            <div class="demo-quick-buttons">
+              <span class="quick-label">Quick Demo Shortcuts:</span>
+              <button class="btn-chip chip-success" onclick="runQuickDemo(1)">1. Happy Path (Zepto ₹400)</button>
+              <button class="btn-chip chip-danger" onclick="runQuickDemo(2)">2. Blocked: Over Daily Cap (Swiggy ₹500)</button>
+              <button class="btn-chip chip-warning" onclick="runQuickDemo(3)">3. Blocked: Wrong Merchant (Blinkit)</button>
+              <button class="btn-chip chip-dark" onclick="runQuickDemo(4)">4. Blocked: Expired Mandate</button>
+            </div>
+            <div id="chat-history" class="chat-history">
+              <div class="chat-message system-message">
+                <div class="msg-avatar">🛡️</div>
+                <div class="msg-content">
+                  <p>Welcome! I am the Agentic Shopping Assistant. Tell me what to purchase, and I will attempt execution via the <strong>Razorpay Mandate & Spend-Gate Service</strong>.</p>
+                  <p class="text-muted">Example: <em>"Order groceries for ₹400 from Zepto for user_rahul"</em></p>
+                </div>
+              </div>
+            </div>
+            <form id="chat-form" class="chat-input-form" onsubmit="handleChatSubmit(event)">
+              <input type="text" id="chat-input" placeholder="Type spend command e.g., 'Order ₹500 groceries from Zepto for user_rahul'..." autocomplete="off">
+              <button type="submit" class="btn btn-primary">Send to Gate 🚀</button>
+            </form>
+          </div>
+
+          <!-- Gate Inspection Sidepanel -->
+          <div class="card gate-inspect-card">
+            <div class="card-header">
+              <h2>⚡ Spend-Gate Execution Inspector</h2>
+              <span id="inspect-status-badge" class="badge badge-neutral">Awaiting Request</span>
+            </div>
+            <div id="inspect-content" class="inspect-body">
+              <div class="placeholder-state">
+                <div class="icon">🔍</div>
+                <p>Run a prompt from the left panel to inspect the 5 sequential gate checks, exact parameters, and Razorpay order output live.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: MANDATE MANAGEMENT -->
+      <section id="tab-mandates" class="tab-content">
+        <div class="card-header-flex">
+          <div>
+            <h2>Pre-Approved Spending Mandates</h2>
+            <p class="text-muted">Consent-based authentication set up in advance with per-merchant spending limits</p>
+          </div>
+          <button class="btn btn-primary" onclick="openNewMandateModal()">+ Create New Mandate</button>
+        </div>
+        <div id="mandates-grid" class="mandates-grid">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </section>
+
+      <!-- TAB 3: AUDIT TRAIL -->
+      <section id="tab-audit" class="tab-content">
+        <div class="card">
+          <div class="card-header-flex">
+            <div>
+              <h2>Immutable Audit Trail</h2>
+              <p class="text-muted">Every money action explainable, bounded, gated, and traced to Razorpay order objects</p>
+            </div>
+            <div class="filter-controls">
+              <select id="audit-filter-decision" onchange="loadAuditLogs()">
+                <option value="">All Decisions</option>
+                <option value="approved">Approved Only</option>
+                <option value="denied">Denied Only</option>
+                <option value="error">Errors Only</option>
+              </select>
+              <button class="btn btn-secondary" onclick="loadAuditLogs()">🔄 Refresh Audit Trail</button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="audit-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Mandate ID</th>
+                  <th>User / Merchant</th>
+                  <th>Requested</th>
+                  <th>Decision</th>
+                  <th>Reason</th>
+                  <th>Razorpay Order ID</th>
+                </tr>
+              </thead>
+              <tbody id="audit-table-body">
+                <!-- Populated dynamically via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Create Mandate Modal -->
+    <div id="modal-mandate" class="modal-overlay">
+      <div class="modal-content card">
+        <div class="card-header">
+          <h3>Create New Mandate</h3>
+          <button class="btn-close" onclick="closeNewMandateModal()">✕</button>
+        </div>
+        <form id="form-new-mandate" onsubmit="submitNewMandate(event)">
+          <div class="form-group">
+            <label>Mandate ID</label>
+            <input type="text" id="m-id" placeholder="mandate_uber_01" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>User ID</label>
+              <input type="text" id="m-user" placeholder="user_rahul" required>
+            </div>
+            <div class="form-group">
+              <label>Merchant ID</label>
+              <input type="text" id="m-merchant" placeholder="uber" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Max Per Txn (₹)</label>
+              <input type="number" id="m-max-txn" placeholder="1000" required>
+            </div>
+            <div class="form-group">
+              <label>Max Per Day (₹)</label>
+              <input type="number" id="m-max-day" placeholder="3000" required>
+            </div>
+            <div class="form-group">
+              <label>Max Total (₹)</label>
+              <input type="number" id="m-max-total" placeholder="10000" required>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" onclick="closeNewMandateModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Create Mandate</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

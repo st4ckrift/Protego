@@ -1,0 +1,24 @@
+[package]
+name = "mandate_gate"
+version = "0.1.0"
+edition = "2021"
+authors = ["Razorpay Agentic Commerce Hackathon Team"]
+description = "Mandate & Spend-Gate Service for Agentic Commerce in Rust"
+
+[lib]
+name = "mandate_gate"
+path = "src/lib.rs"
+
+[[bin]]
+name = "server"
+path = "src/bin/server.rs"
+
+[[bin]]
+name = "seed"
+path = "src/bin/seed.rs"
+
+[[bin]]
+name = "agent"
+path = "src/bin/agent.rs"
+
+[dependencies]
