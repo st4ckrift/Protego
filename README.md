@@ -1,164 +1,193 @@
-# Mandate & Spend-Gate Service for Agentic Commerce (Rust Edition)
-
-> **Razorpay Hackathon (Track 1: AI Growth & Agentic Commerce)**  
-> *"Every money action explainable, bounded and gated. Show the audit trail and one failure handled gracefully."*
+# Protego
+> A deterministic spend-gate shield sitting between AI shopping agents and payment APIs to enforce pre-approved money bounds before transactions occur.
 
 ---
 
-## 📌 Problem Statement
+## The Problem, in Plain Language
 
-As AI shopping agents gain autonomy to transact on behalf of users, leaving payment authorization to non-deterministic LLM logic creates unacceptable financial risk. The **Mandate & Spend-Gate Service** acts as an immutable, race-safe enforcement proxy between an AI agent's *spending intent* and Razorpay's payment APIs. Inspired by Razorpay + NPCI's production Agentic Payments protocol, this service enforces pre-approved spending mandates (per-transaction caps, daily rolling limits, lifetime caps, merchant scoping, and expiration dates) in **deterministic, type-safe Rust code**, logging every decision immutably before forwarding approved transactions to Razorpay's test-mode order APIs.
+Imagine handing a credit card with an unlimited spending cap to a personal shopping assistant and saying, *"Buy some groceries."* If the assistant misinterprets your request or gets tricked, it could spend ₹50,000 in seconds. 
 
----
+Instead of an uncapped credit card, Protego works like a digital **Allowance Card**. You define strict spending rules in advance—for instance, *"Maximum ₹800 per order, up to ₹2,000 per day, only at Zepto."*
 
-## 🦀 Why Rust? Type-Safe Money & Concurrency Guarantees
-
-1. **Unrepresentable Invalid States:** Mandate status is modeled as a strongly typed Rust `enum MandateStatus { Active, Expired, Revoked }`, eliminating stringly-typed state bugs at compile time.
-2. **Zero Floating-Point Money Handling:** All financial figures (`max_per_txn`, `max_per_day`, `spent_today`, `spent_total`, requested `amount`) are represented strictly as 64-bit integer paise (`i64`), guaranteeing integer precision and preventing rounding errors.
-3. **Race-Safe Concurrency & Atomic Locking:** Uses SQLite WAL mode with `BEGIN IMMEDIATE` transaction locking and `busy_timeout=5000`. Tested with multi-threaded parallel requests to guarantee that simultaneous agent calls against the same mandate can **never overspend** remaining limits.
-4. **Transaction Rollback on API Errors:** If Razorpay API call fails (network drop or invalid credentials), the gate executes an explicit `conn.rollback()`, ensuring no money is deducted from mandate balances when payment creation fails.
+Before your AI shopping agent can place any order, it must ask Protego for permission. Protego evaluates the order against your rules in deterministic code. If the purchase fits your rules, Protego allows the payment to proceed to Razorpay. If even one rule is broken, Protego blocks the transaction instantly and explains exactly why and by how much.
 
 ---
 
-## 🏗 System Architecture
+## How It Works
+
+Protego acts as a gatekeeper between the AI agent's purchase intent and Razorpay's payment infrastructure.
 
 ```
-                                 ┌───────────────────────────────┐
-                                 │   User / Shopping Intent      │
-                                 └──────────────┬────────────────┘
-                                                │
-                                                ▼
-                                 ┌───────────────────────────────┐
-                                 │     AI Agent NLU Layer        │
-                                 │ (Extracts User/Merchant/INR)  │
-                                 └──────────────┬────────────────┘
-                                                │
-                                                ▼ (Calls ONLY Gate Endpoint)
- ┌──────────────────────────────────────────────────────────────────────────────┐
- │                    RUST MANDATE & SPEND-GATE SERVICE                         │
- │                                                                              │
- │  Check 1: Does mandate exist for User + Merchant pair?                       │
- │  Check 2: Is mandate status Active and unexpired?                            │
- │  Check 3: Is requested amount <= max_per_txn cap?                            │
- │  Check 4: Would spent_today + amount <= max_per_day cap? (Auto Daily Reset)  │
- │  Check 5: Would spent_total + amount <= max_total cap?                       │
- └──────────────────────┬───────────────────────────────┬───────────────────────┘
-                        │                               │
-                [If Any Check Fails]                    │ [If ALL Checks Pass]
-                        │                               │
-                        ▼                               ▼
-      ┌───────────────────────────────────┐  ┌───────────────────────────────────┐
-      │     Structured Denial Response    │  │ Razorpay Test API (orders.create) │
-      │  (Exact limits & already spent)   │  └─────────────────┬─────────────────┘
-      └─────────────────┬─────────────────┘                    │
-                        │                                      ▼
-                        │                       ┌───────────────────────────────┐
-                        │                       │  Razorpay Order ID Created    │
-                        │                       └──────────────┬────────────────┘
-                        │                                      │
-                        ▼                                      ▼
-      ┌─────────────────────────────────────────────────────────────────────────┐
-      │                     IMMUTABLE AUDIT LOG (SQLite)                        │
-      │   (Records Log ID, Timestamp, Decision, Metrics, Razorpay Order ID)     │
-      └─────────────────────────────────────────────────────────────────────────┘
+[ User Request ] ──> [ AI Agent ] ──> [ Protego Spend-Gate ] ──> [ Razorpay API ]
+                                             │
+                                    Runs 8 Specific Checks
+                                             │
+                                 ┌───────────┴───────────┐
+                             ✅ Approved             🚫 Blocked
+                      (Razorpay Order Created)   (Specific Reason + Numbers)
+                                 │                       │
+                                 └───────────┬───────────┘
+                                             ▼
+                                  [ Immutable Audit Log ]
+```
+
+### Validation Check Sequence
+
+When `POST /gate/authorize` is called, Protego runs **8 specific sequential checks** inside a thread-safe SQLite transaction:
+
+1. **Mandate Existence**: Verifies that the requested mandate ID exists (or auto-resolves the latest active mandate for the user/merchant pair).
+2. **User Identity Match**: Confirms the mandate belongs to the requesting `user_id` (`user_mismatch`).
+3. **Merchant Scope Match**: Confirms the mandate is scoped to the target `merchant_id` (`merchant_mismatch`).
+4. **Revocation Check**: Ensures the mandate has not been revoked by the user (`mandate_revoked`).
+5. **Expiration Check**: Checks if the mandate timestamp is expired (`mandate_expired`). Also auto-resets `spent_today` to `0` if the date has advanced.
+6. **Per-Transaction Cap**: Verifies `amount <= max_per_txn` (`max_per_txn_exceeded`).
+7. **Daily Spend Cap**: Verifies `spent_today + amount <= max_per_day` (`max_per_day_exceeded`).
+8. **Lifetime Cap**: Verifies `spent_total + amount <= max_total` (`max_total_exceeded`).
+
+---
+
+## Architecture
+
+Protego is built in Rust with **zero external dependencies** (`Cargo.toml` has an empty `[dependencies]` block). Every layer—from SQLite FFI bindings to the multithreaded HTTP server—is implemented against the Rust standard library.
+
+```
+src/
+├── lib.rs              # Root library module declarations
+├── config.rs           # Environment variable loader (.env parser with default fallbacks)
+├── models.rs           # Data structures, JSON serializers, and MandateStatus enum
+├── database.rs         # Safe Rust FFI wrapper over C sqlite3 library (WAL & busy_timeout)
+├── gate_service.rs     # Core decision engine enforcing the 8 sequential checks & locking
+├── audit_service.rs    # Engine for writing and fetching immutable audit trail entries
+├── razorpay_client.rs  # Razorpay API client (shells out to curl or returns simulated orders)
+├── nlu_parser.rs       # Deterministic keyword & digit parser for user spend prompts
+├── agent_service.rs    # Agent coordinator that calls the gate and formats markdown replies
+├── server_service.rs   # Multithreaded HTTP REST API & static file web server (std::net)
+└── bin/
+    ├── seed.rs         # Database seeder binary (`cargo run --bin seed`)
+    ├── server.rs       # Server launcher binary (`cargo run --bin server`)
+    └── agent.rs        # CLI agent runner binary (`cargo run --bin agent -- "..."`)
 ```
 
 ---
 
-## 🔒 The 5 Mandatory Gate Checks (Sequential Execution)
+## Key Design Decisions & Technical Callouts
 
-For every transaction authorization request (`POST /gate/authorize`), the gate executes the following **5 strict sequential checks** inside a thread-safe SQLite `BEGIN IMMEDIATE` atomic transaction:
+### 1. Concurrency & Race-Condition Safety
+In agentic shopping, an agent might issue rapid concurrent payment requests. Protego uses SQLite `BEGIN IMMEDIATE` transaction locking with `PRAGMA busy_timeout=5000;`. This ensures two parallel authorization requests against the same mandate cannot overspend remaining daily limits. The test suite includes `test_concurrency_race_condition`, which spawns simultaneous parallel OS threads to prove that exactly one transaction succeeds and the other is denied.
 
-1. **Existence & Identity Match:** Verifies mandate exists and `user_id` + `merchant_id` match.
-2. **Active Status & Expiration:** Rejects if mandate is `Revoked` or `expires_at` timestamp has passed. Auto-resets daily spend counter if date has advanced.
-3. **Per-Transaction Cap (`max_per_txn`):** Rejects if `amount > max_per_txn`.
-4. **Daily Spend Cap (`max_per_day`):** Rejects if `spent_today + amount > max_per_day`.
-5. **Lifetime Cap (`max_total`):** Rejects if `spent_total + amount > max_total`.
+### 2. Deterministic Rule-Based Intent Parsing
+Protego does **not** rely on an LLM for money decisions or intent parsing. `nlu_parser.rs` uses deterministic keyword matching and currency digit extraction. Spending decisions must be predictable, auditable, and testable; keeping the NLU deterministic prevents non-deterministic LLM behavior from influencing the financial boundary.
+
+### 3. Zero-Dependency Rust Implementation
+The Rust codebase avoids third-party crates (`serde`, `axum`, `rusqlite`, `reqwest`).
+- **SQLite**: Bound directly via C FFI (`extern "C"`) to `/usr/lib/libsqlite3.so`.
+- **HTTP Server**: Implemented with `std::net::TcpListener` spawning a `std::thread` per connection.
+- **JSON Handling**: Hand-crafted serialization and parsing routines in `models.rs` and `server_service.rs`.
+
+*Trade-off note*: Writing low-level FFI and socket handlers provided total control over execution and locking semantics without crate bloat, though it required custom JSON parsers and manual C string memory management.
 
 ---
 
-## 🚀 Quick Start Guide
+## Getting Started
 
-### 1. Build Project
+### 1. Prerequisites
+- Rust compiler & Cargo (`rustc 1.80+` / `cargo`)
+- `libsqlite3` installed on system (`sqlite3.h` and `libsqlite3.so`)
+- `curl` binary installed (used by `razorpay_client.rs` when real API keys are set)
+
+### 2. Environment Configuration
+Copy `.env.example` to `.env`:
 ```bash
-cargo build
+cp .env.example .env
 ```
 
-### 2. Seed Sample Database
-Populate realistic demo mandates (Zepto, Swiggy, Amazon, Expired Blinkit):
+Default variables:
+```env
+PORT=8000
+HOST=0.0.0.0
+DB_PATH=mandate_gate.db
+RAZORPAY_KEY_ID=rzp_test_your_key_id
+RAZORPAY_KEY_SECRET=your_test_secret
+OPENAI_API_KEY=your_openai_api_key
+```
+*Note*: If `RAZORPAY_KEY_ID` is left as placeholder or empty, Protego runs in **simulated mode**, generating realistic `order_test_...` IDs so the demo works fully offline without live Razorpay credentials.
+
+### 3. Seed Database
+Populate sample mandates (Zepto, Swiggy, Amazon, Expired Blinkit):
 ```bash
 cargo run --bin seed
 ```
 
-### 3. Run Native HTTP Server & Web UI
+### 4. Run Server & Web Dashboard
+Start the HTTP server on port 8000:
 ```bash
 cargo run --bin server
 ```
-Open **`http://localhost:8000`** in your browser to access the Interactive Dashboard & AI Agent Simulator.
+Access the interactive web UI at **`http://localhost:8000`**.
 
-### 4. Run CLI Agent Simulator
+### 5. Run CLI Agent Simulator
+Run single prompts from the command line:
 ```bash
 cargo run --bin agent -- "Order groceries for ₹400 from Zepto for user_rahul"
 ```
 
-### 5. Run Unit & Concurrency Test Suite
+### 6. Run Test Suite
+Execute unit and concurrency tests:
 ```bash
 cargo test
 ```
 
 ---
 
-## 🎬 5-Step Hackathon Demo Script
+## Using the Dashboard
 
-Run this sequence during judge evaluations to demonstrate complete compliance with the Track 1 brief:
+When you open `http://localhost:8000` in your web browser, you will find three main tabs:
 
-### 1. Happy Path — Approved Transaction
-- **Command:** `cargo run --bin agent -- "Order groceries for ₹400 from Zepto for user_rahul"`
-- **Result:** **APPROVED**. Mandate `mandate_zepto_01` allows ₹800 per transaction and ₹2,000 per day. Gate returns Razorpay Order ID (e.g. `order_test_...`) and updates mandate counters.
+1. **AI Agent Simulator**:
+   - Type shopping requests in plain English (e.g., *"Order groceries for ₹400 from Zepto for user_rahul"*).
+   - Use the **Quick Demo Shortcuts** buttons to test Happy Path, Over Daily Cap, Wrong Merchant, or Expired Mandate in one click.
+   - The right-hand panel (**Spend-Gate Execution Inspector**) shows the live pass/fail status of all gate checks and the raw JSON response payload.
 
-### 2. Blocked — Exceeds Daily Cap
-- **Command:** `cargo run --bin agent -- "Order food for ₹500 from Swiggy for user_rahul"`
-- **Result:** **DENIED** (`max_per_day_exceeded`). Mandate `mandate_swiggy_01` has ₹2,800 spent today out of a ₹3,000 daily cap. Requesting ₹500 exceeds the remaining ₹200 limit. Gate returns structured denial details.
+2. **Active Mandates**:
+   - View visual cards for all pre-approved mandates.
+   - Monitor daily and lifetime spending progress bars.
+   - Use the **+ Create New Mandate** button to add custom mandates on the fly.
 
-### 3. Blocked — Wrong Merchant
-- **Command:** `cargo run --bin agent -- "Buy snacks for ₹300 from Blinkit for user_rahul"`
-- **Result:** **DENIED** (`merchant_mismatch` or `mandate_expired`). Shows the gate enforcing strict merchant scope isolation.
-
-### 4. Multi-Threaded Concurrency Race-Safety Verification
-- **Run:** `cargo test test_concurrency_race_condition`
-- **Result:** Spawns parallel threads firing simultaneous spend requests against a mandate with ₹500 remaining limit. Proves that **exactly 1 succeeds** and **exactly 1 gets blocked**, preventing double-spending.
-
-### 5. Full Audit Trail Walkthrough
-- Open **Tab 3: Immutable Audit Trail** on `http://localhost:8000` (or query `GET /gate/audit`).
-- Show that every attempt (Approved or Denied) generates an immutable, timestamped record linked to the exact mandate state and Razorpay Order ID.
+3. **Immutable Audit Trail**:
+   - View a complete history of every authorization request.
+   - Filter logs by decision (`Approved`, `Denied`).
+   - Inspect timestamp, requested amounts, decision reasons, and linked Razorpay Order IDs.
 
 ---
 
-## 📁 Repository Structure
+## Testing
 
-```
-├── Cargo.toml              # Cargo build manifest & binary target definitions
-├── src/
-│   ├── lib.rs              # Root library exports
-│   ├── config.rs           # Environment configuration loader
-│   ├── models.rs           # MandateModel, MandateStatus enum, GateDecision, AuditLogEntry
-│   ├── database.rs         # Safe Rust FFI SQLite engine wrapper with WAL & busy timeout
-│   ├── gate_service.rs     # Core 5-step decision engine & atomic transaction locking
-│   ├── razorpay_client.rs  # Razorpay test mode HTTP integration & error handling
-│   ├── audit_service.rs    # Immutable audit logging engine
-│   ├── nlu_parser.rs       # Dual NLU parser (OpenAI API + fallback regex parser)
-│   ├── agent_service.rs    # Agent execution flow & plain language explanation generator
-│   ├── server_service.rs   # Multithreaded HTTP REST server & web UI static host
-│   └── bin/
-│       ├── seed.rs         # Seed binary (cargo run --bin seed)
-│       ├── server.rs       # Server binary (cargo run --bin server)
-│       └── agent.rs        # CLI binary (cargo run --bin agent -- "...")
-├── static/
-│   ├── index.html          # Modern Web Dashboard UI
-│   ├── app.js              # Tab router & live audit trail client
-│   └── style.css           # UI styling
-├── tests/
-│   └── gate_test.rs        # 9 Rust unit & multi-threaded concurrency tests
-├── .env.example            # Environment variables template
-└── README.md               # Documentation
-```
+The test suite in `tests/gate_test.rs` covers core decision logic and race safety:
+
+- `test_approved_transaction`: Verifies valid transactions pass all checks, update mandate spend counters, and create audit entries.
+- `test_max_per_txn_exceeded`: Tests denial when an order exceeds the single-transaction cap.
+- `test_max_per_day_exceeded`: Tests denial when an order exceeds the remaining daily cap.
+- `test_merchant_mismatch`: Verifies blocking when requesting a transaction at an unapproved merchant.
+- `test_user_mismatch`: Verifies blocking when requesting spend against another user's mandate.
+- `test_expired_mandate`: Confirms transactions against expired mandates are blocked.
+- `test_revoked_mandate`: Confirms transactions against revoked mandates are blocked.
+- `test_daily_reset_logic`: Tests that daily spend counters reset when `last_spent_date` advances.
+- `test_concurrency_race_condition`: Spawns two parallel OS threads attempting simultaneous spend against a mandate with ₹500 remaining limit. Asserts that **exactly one succeeds** and **exactly one is denied**.
+
+---
+
+## Known Limitations & Honest Scope Notes
+
+- **Simplified Timestamp Formatting**: `audit_service.rs` uses a simplified year calculation (`format!("{}-01-01T00:00:00Z", 1970 + secs / 31536000)`). Month and day components in ISO strings default to `-01-01T00:00:00Z`.
+- **No LLM Integration**: Despite `Config` reading `OPENAI_API_KEY`, intent parsing in `nlu_parser.rs` is entirely deterministic (keyword and regex-style numeric extraction). No OpenAI API calls are currently wired up.
+- **Curl Shell-Out**: When live Razorpay keys are configured, `razorpay_client.rs` calls `std::process::Command::new("curl")` to POST to `https://api.razorpay.com/v1/orders` rather than using a native Rust HTTP client crate.
+- **Basic HTTP Request Parsing**: The custom HTTP server in `server_service.rs` reads up to 8192 bytes from incoming TCP connections, suitable for lightweight JSON payloads but not large body streams.
+
+---
+
+## What's Next
+
+1. **Proper HTTP Client**: Replace the `curl` shell-out in `razorpay_client.rs` with standard library TCP/TLS sockets.
+2. **Accurate Date Formatting**: Replace the simplified year-only timestamp function in `audit_service.rs` with full UTC month/day/time formatting.
+3. **Optional LLM Parser**: Wire an optional LLM intent parser with strict schema validation while keeping the Spend-Gate enforcement deterministic.
+4. **Mandate Rule DSL**: Build a user-friendly rule builder for setting time window restrictions and dynamic spend limits.
