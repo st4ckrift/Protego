@@ -3,6 +3,7 @@ const API_BASE = "";
 document.addEventListener("DOMContentLoaded", () => {
   loadMandates();
   loadAuditLogs();
+  initScrollReveal();
 });
 
 /* ===========================
@@ -132,6 +133,9 @@ function renderMandates(mandates) {
       </div>
     `;
   }).join("");
+
+  // Trigger stagger animation for newly inserted cards
+  observeNewStaggerChildren();
 }
 
 /* ===========================
@@ -264,9 +268,10 @@ function appendChatMessage(role, htmlContent, id) {
   msgDiv.className = `chat-message ${role}-message`;
   if (id) msgDiv.id = id;
 
+  // Filled shield for system; filled person for user
   const avatarSvg = role === "user"
-    ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
-    : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`;
+    ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>`
+    : `<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2L4 5v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V5z"/></svg>`;
 
   msgDiv.innerHTML = `
     <div class="msg-avatar" aria-hidden="true">${avatarSvg}</div>
@@ -500,3 +505,72 @@ document.addEventListener("keydown", e => {
     if (overlay && overlay.classList.contains("active")) closeNewMandateModal();
   }
 });
+
+/* ===========================
+   THEME TOGGLE
+   =========================== */
+function toggleTheme() {
+  const html    = document.documentElement;
+  const current = html.getAttribute("data-theme");
+  const next    = current === "dark" ? "light" : "dark";
+  html.setAttribute("data-theme", next);
+  localStorage.setItem("protego-theme", next);
+
+  const btn = document.getElementById("btn-theme");
+  if (btn) btn.setAttribute("aria-label", next === "dark" ? "Switch to light mode" : "Switch to dark mode");
+}
+
+/* ===========================
+   SCROLL-ENTRY REVEAL
+   IntersectionObserver — never window.scroll
+   =========================== */
+function initScrollReveal() {
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry, i) => {
+        if (!entry.isIntersecting) return;
+
+        const el = entry.target;
+
+        // Stagger children of .stagger containers
+        if (el.classList.contains("stagger")) {
+          Array.from(el.children).forEach((child, idx) => {
+            child.style.transitionDelay = `${idx * 80}ms`;
+            child.classList.add("visible");
+          });
+        } else {
+          el.classList.add("visible");
+        }
+
+        observer.unobserve(el);
+      });
+    },
+    { threshold: 0.08, rootMargin: "0px 0px -40px 0px" }
+  );
+
+  // Observe all .reveal elements
+  document.querySelectorAll(".reveal").forEach(el => observer.observe(el));
+
+  // Observe .stagger containers directly (children are styled via CSS)
+  document.querySelectorAll(".stagger").forEach(el => observer.observe(el));
+}
+
+// Re-run reveal on newly rendered stagger children (mandates grid)
+function observeNewStaggerChildren() {
+  document.querySelectorAll(".stagger > *").forEach(child => {
+    child.style.transitionDelay = "";
+    child.classList.remove("visible");
+  });
+  // Small delay to allow DOM paint, then trigger
+  requestAnimationFrame(() => {
+    document.querySelectorAll(".stagger").forEach(el => {
+      // Force re-observation by creating a new observer snapshot
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight) {
+        Array.from(el.children).forEach((child, idx) => {
+          setTimeout(() => child.classList.add("visible"), idx * 80);
+        });
+      }
+    });
+  });
+}

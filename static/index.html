@@ -1,40 +1,56 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mandate & Spend-Gate | Razorpay Agentic Commerce</title>
+  <title>Protego — Mandate &amp; Spend-Gate</title>
   <meta name="description" content="Deterministic spend enforcement for AI agents. Pre-approved mandate policies with per-merchant guardrails, powered by Razorpay.">
-  <meta property="og:title" content="Mandate & Spend-Gate Service">
+  <meta property="og:title" content="Protego — Mandate &amp; Spend-Gate">
   <meta property="og:description" content="Cryptographically verified, consent-bound authorization for agentic payments.">
   <meta property="og:type" content="website">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f7cff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23111111'%3E%3Cpath d='M12 2L4 5v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V5z'/%3E%3C/svg%3E">
+
+  <!-- Fonts: Geist (UI), Newsreader (editorial accents if desired), Geist Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!--
+    Geist Sans via CDN (vercel's open source font).
+    Falls back to Helvetica Neue / system-ui per protocol.
+  -->
+  <link href="https://cdn.jsdelivr.net/npm/@vercel/font@latest/dist/geist-sans.css" rel="stylesheet" onerror="this.remove()">
+
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+  <!-- Ambient warm background layer — fixed, pointer-events: none -->
+  <div class="ambient-layer" aria-hidden="true"></div>
 
   <a href="#main-content" class="skip-link">Skip to main content</a>
 
   <div class="app-container">
 
-    <!-- Header -->
-    <header class="navbar">
+    <!-- =============================================
+         HEADER
+         ============================================= -->
+    <header class="navbar reveal">
       <div class="nav-brand">
         <div class="logo-icon" aria-hidden="true">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            <path d="m9 12 2 2 4-4"/>
+          <!-- Shield icon — filled, bold -->
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 2L4 5v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V5z"/>
           </svg>
         </div>
         <div class="brand-text">
           <div class="brand-title-row">
-            <h1>Mandate &amp; Spend-Gate</h1>
+            <h1>Protego</h1>
             <span class="version-tag">v1.0 Rust</span>
           </div>
-          <p class="subtitle">Razorpay Agentic Commerce · Track 1 AI Growth &amp; Governance</p>
+          <p class="subtitle">Mandate &amp; Spend-Gate · Razorpay Agentic Commerce</p>
         </div>
       </div>
       <div class="nav-actions">
@@ -42,8 +58,27 @@
           <span class="status-dot"></span>
           Gate active
         </span>
+        <button class="theme-toggle" id="btn-theme" onclick="toggleTheme()" aria-label="Toggle dark mode">
+          <!-- Moon — shown in light mode -->
+          <svg class="icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+          <!-- Sun — shown in dark mode -->
+          <svg class="icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+        </button>
         <button id="btn-seed" class="btn btn-secondary" onclick="seedDb()" aria-label="Reseed sample mandates">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <!-- Refresh icon — bold strokes -->
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
             <path d="M21 3v5h-5"/>
             <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
@@ -54,103 +89,114 @@
       </div>
     </header>
 
-    <!-- Navigation Tabs -->
-    <nav class="tab-nav" aria-label="Primary navigation">
+    <!-- =============================================
+         TAB NAVIGATION
+         ============================================= -->
+    <nav class="tab-nav reveal" aria-label="Primary navigation">
       <button class="tab-btn active" onclick="switchTab('agent-sim')" aria-selected="true" role="tab" aria-controls="tab-agent-sim">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <!-- Terminal / CPU icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect width="18" height="12" x="3" y="6" rx="2"/>
-          <path d="M9 12h.01"/>
-          <path d="M15 12h.01"/>
-          <path d="M12 2v4"/>
+          <path d="M9 12h.01M15 12h.01M12 2v4"/>
         </svg>
-        AI agent simulator
+        Agent simulator
       </button>
       <button class="tab-btn" onclick="switchTab('mandates')" aria-selected="false" role="tab" aria-controls="tab-mandates">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <!-- Credit card icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect width="20" height="14" x="2" y="5" rx="2"/>
           <line x1="2" x2="22" y1="10" y2="10"/>
         </svg>
-        Active mandates (<span id="mandate-count">0</span>)
+        Mandates (<span id="mandate-count">0</span>)
       </button>
       <button class="tab-btn" onclick="switchTab('audit')" aria-selected="false" role="tab" aria-controls="tab-audit">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <!-- File / log icon -->
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
           <polyline points="14 2 14 8 20 8"/>
           <line x1="16" x2="8" y1="13" y2="13"/>
           <line x1="16" x2="8" y1="17" y2="17"/>
-          <line x1="10" x2="8" y1="9" y2="9"/>
         </svg>
         Audit trail
       </button>
     </nav>
 
-    <!-- Main Content -->
+    <!-- =============================================
+         MAIN CONTENT
+         ============================================= -->
     <main id="main-content" class="content-area">
 
-      <!-- TAB 1: AI AGENT SIMULATOR -->
-      <section id="tab-agent-sim" class="tab-content active" role="tabpanel" aria-labelledby="tab-btn-agent-sim">
+      <!-- ── TAB 1: AI AGENT SIMULATOR ───────────── -->
+      <section id="tab-agent-sim" class="tab-content active" role="tabpanel">
         <div class="grid-2col">
 
-          <!-- Chat panel -->
-          <article class="card chat-card">
-            <div class="card-header">
-              <div class="card-title-group">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="header-icon" aria-hidden="true">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
-                <h2>Agent intent &amp; chat</h2>
-              </div>
-              <span class="badge badge-info">Deterministic enforcement</span>
+          <!-- Chat panel — wrapped in faux-OS chrome -->
+          <article class="os-chrome reveal" style="display:flex;flex-direction:column;">
+            <!-- macOS-style title bar -->
+            <div class="os-titlebar">
+              <span class="os-dot"></span>
+              <span class="os-dot"></span>
+              <span class="os-dot"></span>
+              <span class="os-titlebar-label">agent-intent.sh</span>
+              <span class="os-titlebar-badge">
+                <span class="badge badge-info">Deterministic enforcement</span>
+              </span>
             </div>
 
-            <div class="demo-quick-buttons" role="group" aria-label="Quick demo scenarios">
-              <span class="quick-label" id="demo-label">Demo scenarios</span>
-              <div class="chip-group" aria-labelledby="demo-label">
-                <button class="btn-chip chip-success" onclick="runQuickDemo(1)">1. Happy path — Zepto ₹400</button>
-                <button class="btn-chip chip-danger" onclick="runQuickDemo(2)">2. Over daily cap — Swiggy ₹500</button>
-                <button class="btn-chip chip-warning" onclick="runQuickDemo(3)">3. Unregistered merchant — Blinkit</button>
-                <button class="btn-chip chip-neutral" onclick="runQuickDemo(4)">4. Expired mandate</button>
+            <!-- Scenario shortcuts -->
+            <div class="os-body" style="flex:1;display:flex;flex-direction:column;">
+              <div class="demo-quick-buttons" role="group" aria-label="Quick demo scenarios">
+                <span class="quick-label" id="demo-label">Demo scenarios</span>
+                <div class="chip-group" aria-labelledby="demo-label">
+                  <button class="btn-chip chip-success" onclick="runQuickDemo(1)">1. Happy path — Zepto ₹400</button>
+                  <button class="btn-chip chip-danger"  onclick="runQuickDemo(2)">2. Over daily cap — Swiggy ₹500</button>
+                  <button class="btn-chip chip-warning" onclick="runQuickDemo(3)">3. Unknown merchant — Blinkit</button>
+                  <button class="btn-chip chip-neutral" onclick="runQuickDemo(4)">4. Expired mandate</button>
+                </div>
               </div>
-            </div>
 
-            <div id="chat-history" class="chat-history" role="log" aria-live="polite" aria-label="Conversation">
-              <div class="chat-message system-message">
-                <div class="msg-avatar" aria-hidden="true">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <!-- Conversation log -->
+              <div id="chat-history" class="chat-history" role="log" aria-live="polite" aria-label="Conversation" style="flex:1;min-height:320px;">
+                <div class="chat-message system-message">
+                  <div class="msg-avatar" aria-hidden="true">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2L4 5v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V5z"/>
+                    </svg>
+                  </div>
+                  <div class="msg-content">
+                    <p>Agentic Shopping Assistant ready. Issue a purchasing intent and I will route it through the <strong>Razorpay Mandate &amp; Spend-Gate</strong>.</p>
+                    <p class="text-muted">Example: <code>Order groceries for ₹400 from Zepto for user_rahul</code></p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Input form -->
+              <form id="chat-form" class="chat-input-form" onsubmit="handleChatSubmit(event)" novalidate>
+                <label for="chat-input" class="sr-only">Spend command</label>
+                <input
+                  type="text"
+                  id="chat-input"
+                  placeholder="Order ₹500 groceries from Zepto for user_rahul"
+                  autocomplete="off"
+                  aria-label="Spend command input"
+                >
+                <button type="submit" class="btn btn-primary" aria-label="Send to gate">
+                  Send
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="22" y1="2" x2="11" y2="13"/>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
                   </svg>
-                </div>
-                <div class="msg-content">
-                  <p>Agentic Shopping Assistant ready. Issue a purchasing intent and I will submit it through the <strong>Razorpay Mandate &amp; Spend-Gate</strong>.</p>
-                  <p class="text-muted">Example: <code>Order groceries for ₹400 from Zepto for user_rahul</code></p>
-                </div>
-              </div>
+                </button>
+              </form>
             </div>
-
-            <form id="chat-form" class="chat-input-form" onsubmit="handleChatSubmit(event)" novalidate>
-              <label for="chat-input" class="sr-only">Spend command</label>
-              <input
-                type="text"
-                id="chat-input"
-                placeholder="e.g. Order ₹500 groceries from Zepto for user_rahul"
-                autocomplete="off"
-                aria-label="Spend command input"
-              >
-              <button type="submit" class="btn btn-primary" aria-label="Send to gate">
-                Send
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <line x1="22" y1="2" x2="11" y2="13"/>
-                  <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                </svg>
-              </button>
-            </form>
           </article>
 
-          <!-- Gate Inspector -->
-          <article class="card gate-inspect-card">
+          <!-- Gate Inspector panel -->
+          <article class="card gate-inspect-card reveal" style="animation-delay:80ms;">
             <div class="card-header">
               <div class="card-title-group">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="header-icon" aria-hidden="true">
+                <!-- Activity / waveform icon -->
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="header-icon" aria-hidden="true">
                   <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                 </svg>
                 <h2>Gate execution trace</h2>
@@ -160,13 +206,13 @@
             <div id="inspect-content" class="inspect-body">
               <div class="placeholder-state">
                 <div class="icon-frame" aria-hidden="true">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="11" cy="11" r="8"/>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"/>
                   </svg>
                 </div>
                 <h3>No active trace</h3>
-                <p>Run a command from the simulator to inspect check evaluations and Razorpay payloads in real time.</p>
+                <p>Run a scenario to inspect check evaluations and Razorpay payloads in real time.</p>
               </div>
             </div>
           </article>
@@ -174,33 +220,33 @@
         </div>
       </section>
 
-      <!-- TAB 2: MANDATE MANAGEMENT -->
+      <!-- ── TAB 2: MANDATE MANAGEMENT ─────────── -->
       <section id="tab-mandates" class="tab-content" role="tabpanel">
-        <div class="card-header-flex">
+        <div class="card-header-flex reveal">
           <div>
             <h2>Pre-approved spending mandates</h2>
             <p class="text-muted">Cryptographically verified, consent-bound authorization policies with per-merchant guardrails</p>
           </div>
           <button class="btn btn-primary" onclick="openNewMandateModal()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <line x1="12" y1="5" x2="12" y2="19"/>
               <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
             New mandate
           </button>
         </div>
-        <div id="mandates-grid" class="mandates-grid" role="list" aria-label="Mandate cards">
+        <div id="mandates-grid" class="mandates-grid stagger" role="list" aria-label="Mandate cards">
           <!-- Populated dynamically via JS -->
         </div>
       </section>
 
-      <!-- TAB 3: AUDIT TRAIL -->
+      <!-- ── TAB 3: AUDIT TRAIL ──────────────── -->
       <section id="tab-audit" class="tab-content" role="tabpanel">
-        <div class="card">
+        <div class="card reveal">
           <div class="card-header-flex">
             <div>
               <h2>Immutable audit trail</h2>
-              <p class="text-muted">Comprehensive transaction log linking agent intent evaluations to Razorpay order objects</p>
+              <p class="text-muted">Transaction log linking agent intent evaluations to Razorpay order objects</p>
             </div>
             <div class="filter-controls">
               <label for="audit-filter-decision" class="sr-only">Filter by decision</label>
@@ -211,7 +257,7 @@
                 <option value="error">Errors only</option>
               </select>
               <button class="btn btn-secondary" onclick="loadAuditLogs()" aria-label="Refresh audit trail">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                   <path d="M21.5 2v6h-6M2.5 22v-6h6"/>
                   <path d="M2 11.5a10 10 0 0 1 18.8-4.3L21.5 8M2.5 16l1.2 1.8a10 10 0 0 0 18.8-4.3"/>
                 </svg>
@@ -229,7 +275,7 @@
                   <th scope="col">Amount</th>
                   <th scope="col">Decision</th>
                   <th scope="col">Reason</th>
-                  <th scope="col">Razorpay order ID</th>
+                  <th scope="col">Razorpay order</th>
                 </tr>
               </thead>
               <tbody id="audit-table-body">
@@ -242,13 +288,15 @@
 
     </main>
 
-    <!-- Create Mandate Modal -->
+    <!-- =============================================
+         CREATE MANDATE MODAL
+         ============================================= -->
     <div id="modal-mandate" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-mandate-title">
       <div class="modal-content card">
         <div class="card-header">
-          <h3 id="modal-mandate-title">Create new mandate</h3>
+          <h3 id="modal-mandate-title">New mandate</h3>
           <button class="btn-close" onclick="closeNewMandateModal()" aria-label="Close dialog">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
@@ -292,7 +340,17 @@
       </div>
     </div>
 
-  </div>
+  </div><!-- /.app-container -->
+
+  <!-- Inline theme init: runs before first paint to prevent flash -->
+  <script>
+    (function() {
+      const saved = localStorage.getItem('protego-theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
 
   <script src="app.js"></script>
 </body>
